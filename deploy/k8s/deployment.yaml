@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-reflex
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: agent-reflex}
+  template:
+    metadata:
+      labels: {app: agent-reflex}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: reflex
+          image: agent-reflex:1.0.0rc1
+          args: ["agent-reflex", "serve", "--factory", "examples.opa_server_app:build_engine", "--host", "0.0.0.0", "--port", "8080"]
+          env:
+            - name: AGENT_REFLEX_API_KEYS
+              valueFrom:
+                secretKeyRef: {name: agent-reflex-secrets, key: api-keys}
+            - name: OPA_URL
+              value: http://127.0.0.1:8181/v1/data/agent_reflex/decision
+          ports: [{containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /readyz, port: 8080}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: 8080}, periodSeconds: 10}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+        - name: opa
+          image: openpolicyagent/opa:1.19.0-static
+          args: ["run", "--server", "--addr=127.0.0.1:8181", "/policies"]
+          volumeMounts: [{name: policy, mountPath: /policies, readOnly: true}]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: policy
+          configMap: {name: agent-reflex-policy}

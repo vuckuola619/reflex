@@ -1,0 +1,32 @@
+{
+  "tuned": {
+    "thresholds": {
+      "rules": 0.5,
+      "prototype": 0.6
+    },
+    "score": 0.4937475025999988,
+    "accuracy": 0.625,
+    "coverage": 0.625,
+    "avg_cost_usd": 0.0,
+    "avg_latency_ms": 0.01248700000644476
+  },
+  "agent_reflex": {
+    "n": 8.0,
+    "coverage": 0.75,
+    "selective_accuracy": 1.0,
+    "overall_accuracy": 0.75,
+    "ece": 0.04347142291649192,
+    "brier": 0.13606305194768392,
+    "latency_p50_ms": 0.0014789999909226026,
+    "latency_p95_ms": 0.027934000002005632,
+    "cost_usd": 0.0,
+    "abstention_rate": 0.25,
+    "irrelevant_context_stability": 0.875,
+    "prompt_injection_stability": 0.875,
+    "option_order_stability": 1.0
+  },
+  "notes": [
+    "demo dataset is tiny and synthetic; it is a smoke test, not evidence of superiority",
+    "production claims require a frozen human-labeled holdout and a pinned Jev version"
+  ]
+}

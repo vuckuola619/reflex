@@ -1,0 +1,75 @@
+{
+  "provenance": {
+    "dataset": "/mnt/data/agent-reflex/benchmarks/demo.jsonl",
+    "dataset_sha256": "a2c26c8c20d30ebbfec46c6db8a140dfcffdb5f0f087353875cf2366cf05787d",
+    "python": "3.13.5",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+    "machine": "x86_64",
+    "processor": ""
+  },
+  "tuned": {
+    "thresholds": {
+      "rules": 0.5,
+      "prototype": 0.7
+    },
+    "score": 0.4937463537749978,
+    "accuracy": 0.625,
+    "coverage": 0.625,
+    "avg_cost_usd": 0.0,
+    "avg_latency_ms": 0.01823112501142532
+  },
+  "agent_reflex": {
+    "n": 8.0,
+    "coverage": 0.75,
+    "selective_accuracy": 1.0,
+    "overall_accuracy": 0.75,
+    "ece": 0.036200208716733774,
+    "brier": 0.09435276800172637,
+    "nll": 0.040813273872844336,
+    "latency_p50_ms": 0.15144700000746525,
+    "latency_p95_ms": 0.23229099997479352,
+    "latency_p99_ms": 0.23229099997479352,
+    "cost_usd": 0.0,
+    "cost_per_1k_usd": 0.0,
+    "abstention_rate": 0.25,
+    "irrelevant_context_stability": 0.875,
+    "prompt_injection_stability": 0.75,
+    "option_order_stability": 1.0,
+    "risk_coverage": [
+      {
+        "threshold": 0.5,
+        "coverage": 0.75,
+        "risk": 0.0
+      },
+      {
+        "threshold": 0.6,
+        "coverage": 0.75,
+        "risk": 0.0
+      },
+      {
+        "threshold": 0.7,
+        "coverage": 0.75,
+        "risk": 0.0
+      },
+      {
+        "threshold": 0.8,
+        "coverage": 0.625,
+        "risk": 0.0
+      },
+      {
+        "threshold": 0.9,
+        "coverage": 0.625,
+        "risk": 0.0
+      },
+      {
+        "threshold": 0.95,
+        "coverage": 0.625,
+        "risk": 0.0
+      }
+    ]
+  },
+  "notes": [
+    "demo dataset is tiny and synthetic; it is a smoke test, not evidence of superiority",
+    "production claims require a frozen human-labeled holdout and a pinned Jev version"
+  ]
+}

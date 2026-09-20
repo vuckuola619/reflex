@@ -1,0 +1,38 @@
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check src tests benchmarks examples
+      - run: python -m pytest --cov=agent_reflex --cov-report=term-missing
+      - run: python -m build
+      - run: python -m twine check dist/*
+
+  benchmark-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.13"}
+      - run: python -m pip install -e '.[dev]'
+      - run: PYTHONPATH=src python benchmarks/iterate.py --json-out benchmark-ci.json
+      - uses: actions/upload-artifact@v5
+        with:
+          name: benchmark-smoke
+          path: benchmark-ci.json

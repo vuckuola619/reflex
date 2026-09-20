@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-reflex-policy
+data:
+  agent_reflex.rego: |
+    package agent_reflex
+    default decision := null
+    decision := {"value": "deny", "reason": "recursive root deletion is forbidden"} if {
+      contains(sprintf("%v", [input.state]), "rm -rf /")
+    }
+    decision := {"value": "review", "reason": "force push requires review"} if {
+      contains(sprintf("%v", [input.state]), "git push")
+      contains(sprintf("%v", [input.state]), "--force")
+    }

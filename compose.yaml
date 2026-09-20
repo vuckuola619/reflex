@@ -1,0 +1,21 @@
+services:
+  opa:
+    image: openpolicyagent/opa:1.19.0-static
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "/policies"]
+    volumes:
+      - ./policies:/policies:ro
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+
+  reflex:
+    build: .
+    command: ["agent-reflex", "serve", "--factory", "examples.opa_server_app:build_engine", "--host", "0.0.0.0", "--port", "8080"]
+    environment:
+      AGENT_REFLEX_API_KEYS: "${AGENT_REFLEX_API_KEYS:?set AGENT_REFLEX_API_KEYS}"
+      OPA_URL: "http://opa:8181/v1/data/agent_reflex/decision"
+    depends_on: [opa]
+    ports: ["127.0.0.1:8080:8080"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
