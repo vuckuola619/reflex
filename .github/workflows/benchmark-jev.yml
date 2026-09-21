@@ -31,7 +31,7 @@ jobs:
           --json-out benchmark-jev.json
       - name: Evidence gate
         run: PYTHONPATH=src python benchmarks/gate.py benchmark-jev.json
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: benchmark-jev
