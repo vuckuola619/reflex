@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN useradd --create-home --uid 10001 reflex
 WORKDIR /app
 COPY --from=builder /src/dist/*.whl /tmp/
-RUN python -m pip install --no-cache-dir "/tmp/agent_reflex-1.0.0rc1-py3-none-any.whl[server]" && rm -f /tmp/*.whl
+RUN python -m pip install --no-cache-dir /tmp/*.whl && python -m pip install --no-cache-dir 'agent-reflex[server]' && rm -f /tmp/*.whl
 COPY examples ./examples
 USER reflex
 EXPOSE 8080

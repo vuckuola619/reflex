@@ -35,7 +35,10 @@ dev = [
   "ruff>=0.6,<1",
   "mypy>=1.11,<2",
   "build>=1.2,<2",
-  "twine>=5,<7",
+  "twine>=7,<8",
+  "httpx2>=2.13,<3",
+  "python-dotenv>=1.2,<2",
+  "psutil>=7.2,<8",
 ]
 security = ["pip-audit>=2.7,<3"]
 all = [
@@ -57,7 +60,7 @@ agent-reflex = "agent_reflex.cli:main"
 packages = ["src/agent_reflex"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "benchmarks", "docs", "examples", "skills", "policies", "scripts", "deploy", "*.md", "LICENSE", "pyproject.toml", "Dockerfile", "compose.yaml", "uv.lock", "pylock.toml", "requirements*.txt"]
+include = ["src", "tests", "benchmarks", "docs", "examples", "skills", "policies", "scripts", "deploy", "constraints", "*.md", "LICENSE", "pyproject.toml", "Dockerfile", "compose.yaml", "uv.lock", "pylock.toml", "requirements*.txt"]
 exclude = [".env", ".env.*", "artifacts", "dist", "build", "**/__pycache__"]
 
 [tool.pytest.ini_options]
@@ -86,11 +89,14 @@ branch = true
 omit = [
   "src/agent_reflex/cli.py",
   "src/agent_reflex/mcp.py",
-  "src/agent_reflex/providers/embedding.py",
   "src/agent_reflex/providers/jev.py",
   "src/agent_reflex/providers/transformers.py",
 ]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 80
+fail_under = 90
+
+[[tool.mypy.overrides]]
+module = ["torch", "transformers", "sentence_transformers", "numpy", "pydantic_ai"]
+ignore_missing_imports = true

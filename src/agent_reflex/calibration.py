@@ -24,7 +24,9 @@ class TemperatureCalibrator:
         return 1 / (1 + math.exp(-logit))
 
     @classmethod
-    def fit(cls, confidences: list[float], correct: list[bool], grid: tuple[float, ...] | None = None) -> "TemperatureCalibrator":
+    def fit(
+        cls, confidences: list[float], correct: list[bool], grid: tuple[float, ...] | None = None
+    ) -> TemperatureCalibrator:
         if len(confidences) != len(correct) or not confidences:
             raise ValueError("confidences and correct must be non-empty and same length")
         grid = grid or tuple(x / 20 for x in range(2, 101))
@@ -32,7 +34,7 @@ class TemperatureCalibrator:
         for t in grid:
             cal = cls(t)
             loss = 0.0
-            for p, y in zip(confidences, correct):
+            for p, y in zip(confidences, correct, strict=False):
                 q = _clip(cal.transform(p))
                 loss += -(math.log(q) if y else math.log(1 - q))
             if loss < best_loss:

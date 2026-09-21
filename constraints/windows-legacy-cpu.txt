@@ -1,0 +1,3 @@
+# Verified on this Windows VM, Python 3.12. Newer NumPy wheels require X86_V2.
+# Apply only where CPU compatibility requires it; this is not a global pin.
+numpy==2.2.6

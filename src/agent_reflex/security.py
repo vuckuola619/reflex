@@ -14,9 +14,9 @@ _RULES: list[tuple[re.Pattern[str], str]] = [
 
 
 def redact_text(value: str) -> str:
-    out=value
-    for pattern,repl in _RULES:
-        out=pattern.sub(repl,out)
+    out = value
+    for pattern, repl in _RULES:
+        out = pattern.sub(repl, out)
     return out
 
 
@@ -26,24 +26,30 @@ def sanitize(value: Any, *, max_depth: int = 8, max_items: int = 256, max_string
     if value is None or isinstance(value, (bool, int, float)):
         return value
     if isinstance(value, str):
-        text=redact_text(value)
-        return text if len(text)<=max_string else text[:max_string]+"...[TRUNCATED]"
-    if is_dataclass(value):
-        value=asdict(value)
+        text = redact_text(value)
+        return text if len(text) <= max_string else text[:max_string] + "...[TRUNCATED]"
+    if is_dataclass(value) and not isinstance(value, type):
+        value = asdict(value)
     if isinstance(value, dict):
-        out: dict[str,Any]={}
-        for idx,(k,v) in enumerate(value.items()):
-            if idx>=max_items:
-                out["__truncated__"]=True; break
-            key=redact_text(str(k))
-            if str(k).lower() in {"authorization","api_key","apikey","token","secret","password","passwd"}:
-                out[key]="[REDACTED]"
+        out: dict[str, Any] = {}
+        for idx, (k, v) in enumerate(value.items()):
+            if idx >= max_items:
+                out["__truncated__"] = True
+                break
+            key = redact_text(str(k))
+            if str(k).lower() in {"authorization", "api_key", "apikey", "token", "secret", "password", "passwd"}:
+                out[key] = "[REDACTED]"
             else:
-                out[key]=sanitize(v,max_depth=max_depth,max_items=max_items,max_string=max_string,_depth=_depth+1)
+                out[key] = sanitize(
+                    v, max_depth=max_depth, max_items=max_items, max_string=max_string, _depth=_depth + 1
+                )
         return out
-    if isinstance(value,(list,tuple,set,frozenset)):
-        seq=list(value)[:max_items]
-        out=[sanitize(x,max_depth=max_depth,max_items=max_items,max_string=max_string,_depth=_depth+1) for x in seq]
-        if len(value)>max_items: out.append("[TRUNCATED_ITEMS]")
-        return out
-    return sanitize(repr(value),max_depth=max_depth,max_items=max_items,max_string=max_string,_depth=_depth+1)
+    if isinstance(value, (list, tuple, set, frozenset)):
+        seq = list(value)[:max_items]
+        items = [
+            sanitize(x, max_depth=max_depth, max_items=max_items, max_string=max_string, _depth=_depth + 1) for x in seq
+        ]
+        if len(value) > max_items:
+            items.append("[TRUNCATED_ITEMS]")
+        return items
+    return sanitize(repr(value), max_depth=max_depth, max_items=max_items, max_string=max_string, _depth=_depth + 1)

@@ -3,9 +3,10 @@ from __future__ import annotations
 import math
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Any, Iterable
+from typing import Any
 
 from agent_reflex.providers.base import ProviderCapabilities
 from agent_reflex.types import Decision, DecisionKind, DecisionRequest
@@ -32,10 +33,13 @@ class Prototype:
 
 class PrototypeProvider:
     """Dependency-free baseline; intended for tests/small installs, not high-stakes semantics."""
+
     name = "prototype"
     capabilities = ProviderCapabilities(local=True, probabilities=True)
 
-    def __init__(self, examples: Iterable[Prototype] = (), temperature: float = 0.15, *, include_question: bool = False):
+    def __init__(
+        self, examples: Iterable[Prototype] = (), temperature: float = 0.15, *, include_question: bool = False
+    ):
         self.examples = list(examples)
         self.temperature = max(temperature, 1e-6)
         self.include_question = include_question
@@ -52,22 +56,24 @@ class PrototypeProvider:
         for encoded, label in self._encoded:
             scores[label] = max(scores[label], _jaccard(query, encoded))
         if request.kind in {DecisionKind.CHOICE, DecisionKind.SCORE}:
-            scores = {k:v for k,v in scores.items() if k in request.options}
+            scores = {k: v for k, v in scores.items() if k in request.options}
         elif request.kind == DecisionKind.BOOLEAN:
-            scores = {k:v for k,v in scores.items() if isinstance(k, bool)}
+            scores = {k: v for k, v in scores.items() if isinstance(k, bool)}
         if not scores:
             return None
-        labels=list(scores)
-        logits=[scores[x]/self.temperature for x in labels]
-        mx=max(logits)
-        exps=[math.exp(x-mx) for x in logits]
-        total=sum(exps) or 1.0
-        probs={str(label): e/total for label,e in zip(labels,exps)}
-        value=max(labels,key=lambda x: probs[str(x)])
-        sim=max(0.0,min(1.0,float(scores[value])))
-        return Decision(value=value, confidence=probs[str(value)], provider=self.name, probabilities=probs,
-                        latency_ms=(perf_counter()-started)*1000,
-                        metadata={"max_similarity": sim, "ood_score": 1.0-sim})
-
-    async def adecide(self, request: DecisionRequest) -> Decision | None:
-        return self.decide(request)
+        labels = list(scores)
+        logits = [scores[x] / self.temperature for x in labels]
+        mx = max(logits)
+        exps = [math.exp(x - mx) for x in logits]
+        total = sum(exps) or 1.0
+        probs = {str(label): e / total for label, e in zip(labels, exps, strict=False)}
+        value = max(labels, key=lambda x: probs[str(x)])
+        sim = max(0.0, min(1.0, float(scores[value])))
+        return Decision(
+            value=value,
+            confidence=probs[str(value)],
+            provider=self.name,
+            probabilities=probs,
+            latency_ms=(perf_counter() - started) * 1000,
+            metadata={"max_similarity": sim, "ood_score": 1.0 - sim},
+        )

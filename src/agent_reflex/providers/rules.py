@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any
 
 from agent_reflex.providers.base import ProviderCapabilities
 from agent_reflex.types import Decision, DecisionRequest
@@ -34,9 +35,11 @@ class RuleProvider:
         for rule in self.rules:
             if rule.when(request):
                 value = rule.value(request) if callable(rule.value) else rule.value
-                return Decision(value=value, confidence=rule.confidence, provider=self.name,
-                                latency_ms=(perf_counter()-started)*1000, metadata={"rule": rule.name, "deterministic": True})
+                return Decision(
+                    value=value,
+                    confidence=rule.confidence,
+                    provider=self.name,
+                    latency_ms=(perf_counter() - started) * 1000,
+                    metadata={"rule": rule.name, "deterministic": True},
+                )
         return None
-
-    async def adecide(self, request: DecisionRequest) -> Decision | None:
-        return self.decide(request)

@@ -1,23 +1,29 @@
 from __future__ import annotations
 
-import asyncio
 import json
+import math
 import os
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from time import perf_counter
-from typing import Any, Callable, Mapping
+from typing import Any, cast
+from urllib.parse import urlsplit
 
 from agent_reflex.providers.base import ProviderCapabilities
 from agent_reflex.types import Decision, DecisionKind, DecisionRequest
-
 
 Transport = Callable[[str, Mapping[str, str], bytes, float], tuple[int, Mapping[str, str], bytes]]
 
 
 class JevHTTPError(RuntimeError):
     """Raised when the TypeSafe System One HTTP API returns an unusable response."""
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
+        return None
 
 
 def _default_transport(
@@ -28,14 +34,16 @@ def _default_transport(
 ) -> tuple[int, Mapping[str, str], bytes]:
     req = urllib.request.Request(url, data=body, method="POST", headers=dict(headers))
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:  # noqa: S310 - fixed/validated base URL
-            return int(response.status), dict(response.headers.items()), response.read()
+        with urllib.request.build_opener(_NoRedirect()).open(req, timeout=timeout) as response:
+            raw = response.read(1_048_577)
+            if len(raw) > 1_048_576:
+                raise JevHTTPError("TypeSafe response exceeds size limit")
+            return int(response.status), dict(response.headers.items()), raw
     except urllib.error.HTTPError as exc:
         # Never include request headers or the API key in the exception.
-        response_body = exc.read()[:2048]
-        raise JevHTTPError(f"TypeSafe HTTP {exc.code}: {response_body.decode('utf-8', 'replace')}") from None
-    except urllib.error.URLError as exc:
-        raise JevHTTPError(f"TypeSafe connection error: {exc.reason}") from None
+        raise JevHTTPError(f"TypeSafe HTTP {exc.code}") from None
+    except urllib.error.URLError:
+        raise JevHTTPError("TypeSafe connection error") from None
 
 
 @dataclass(slots=True)
@@ -48,7 +56,7 @@ class DirectJevProvider:
     """
 
     model: str = "jev-1.13.0"
-    api_key: str | None = None
+    api_key: str | None = field(default=None, repr=False)
     base_url: str = "https://api.typesafe.ai"
     timeout_s: float = 10.0
     input_price_per_billion_tokens_usd: float = 42.0
@@ -63,13 +71,18 @@ class DirectJevProvider:
             self.base_url = self.base_url[: -len("/v1/systemone")]
         elif self.base_url.endswith("/v1"):
             self.base_url = self.base_url[: -len("/v1")]
-        if not self.base_url.startswith("https://") and not self.base_url.startswith("http://127.0.0.1") and not self.base_url.startswith("http://localhost"):
+        parsed = urlsplit(self.base_url)
+        if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("invalid TypeSafe endpoint URL")
+        if parsed.scheme != "https" and not (
+            parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+        ):
             raise ValueError("TypeSafe base_url must use HTTPS except for localhost fixtures")
-        if self.timeout_s <= 0:
+        if not math.isfinite(self.timeout_s) or self.timeout_s <= 0:
             raise ValueError("timeout_s must be positive")
 
     def _resolved_key(self) -> str:
-        key = self.api_key or os.getenv("TYPESAFE_API_KEY", "")
+        key = self.api_key or os.getenv("TYPESAFE_API_KEY", "") or ""
         if not key.strip():
             raise JevHTTPError("TYPESAFE_API_KEY is not set")
         return key.strip()
@@ -83,7 +96,11 @@ class DirectJevProvider:
             return {"type": "choice", "instructions": request.question, "criteria": criteria}
         if request.kind == DecisionKind.SCORE:
             # The wire API expects an ordered list for Score criteria.
-            return {"type": "score", "instructions": request.question, "criteria": [str(option) for option in request.options]}
+            return {
+                "type": "score",
+                "instructions": request.question,
+                "criteria": [str(option) for option in request.options],
+            }
         raise ValueError(f"unsupported decision kind: {request.kind}")
 
     def _payload(self, request: DecisionRequest) -> bytes:
@@ -98,8 +115,8 @@ class DirectJevProvider:
         ).encode("utf-8")
 
     def estimate_cost(self, request: DecisionRequest) -> float:
-        # Conservative byte-based estimate used only for pre-call budget routing. Actual
-        # accounting is replaced with the API's input_tokens when available.
+        # Heuristic pre-call estimate, not a tokenization guarantee or billing cap.
+        # The runtime retains at least this reservation, even on a failed call.
         approx_tokens = max(1, len(self._payload(request)) // 4)
         return approx_tokens * self.input_price_per_billion_tokens_usd / 1_000_000_000
 
@@ -107,7 +124,7 @@ class DirectJevProvider:
     def _answer_from_payload(payload: Mapping[str, Any]) -> Mapping[str, Any]:
         answers = payload.get("answers")
         if isinstance(answers, Mapping) and isinstance(answers.get("answer"), Mapping):
-            return answers["answer"]  # type: ignore[return-value]
+            return cast(Mapping[str, Any], answers["answer"])
         # Compatibility with early/community System One servers that returned the question
         # map directly instead of wrapping it under `answers`.
         direct = payload.get("answer")
@@ -119,9 +136,10 @@ class DirectJevProvider:
         answer = self._answer_from_payload(payload)
         probabilities: dict[str, float] = {}
         confidence: float
+        value: Any
 
         if request.kind == DecisionKind.BOOLEAN:
-            p_true = float(answer.get("noul"))
+            p_true = float(answer.get("noul", float("nan")))
             if not 0.0 <= p_true <= 1.0:
                 raise JevHTTPError("invalid Noul probability")
             value = p_true >= 0.5
@@ -129,20 +147,28 @@ class DirectJevProvider:
             probabilities = {"false": 1.0 - p_true, "true": p_true}
             confidence_source = "derived_from_noul"
         elif request.kind == DecisionKind.CHOICE:
-            value = answer.get("choice")
+            raw_value = answer.get("choice")
+            matches = [option for option in request.options if str(option) == raw_value]
+            if len(matches) != 1:
+                raise JevHTTPError("choice is not an unambiguous requested option")
+            value = matches[0]
             raw_probabilities = answer.get("probabilities") or {}
             if isinstance(raw_probabilities, Mapping):
                 probabilities = {str(k): float(v) for k, v in raw_probabilities.items()}
             confidence = float(answer.get("confidence", probabilities.get(str(value), 0.0)))
             confidence_source = "api"
         elif request.kind == DecisionKind.SCORE:
-            raw_score = float(answer.get("score"))
-            index = min(max(int(round(raw_score)), 0), len(request.options) - 1)
+            raw_score = float(answer.get("score", float("nan")))
+            if not math.isfinite(raw_score) or not 0 <= raw_score <= len(request.options) - 1:
+                raise JevHTTPError("score is outside the requested scale")
+            index = int(round(raw_score))
             value = request.options[index]
             raw_probabilities = answer.get("probabilities") or {}
             if isinstance(raw_probabilities, Mapping):
-                probabilities = {str(k): float(v) for k, v in raw_probabilities.items()}
-            confidence = float(answer.get("confidence", probabilities.get(str(index), 0.0)))
+                probabilities = {
+                    str(option): float(raw_probabilities.get(str(i), 0.0)) for i, option in enumerate(request.options)
+                }
+            confidence = float(answer.get("confidence", probabilities.get(str(value), 0.0)))
             confidence_source = "api"
         else:  # pragma: no cover - DecisionRequest validation constrains this
             raise JevHTTPError("unsupported decision kind")
@@ -151,7 +177,7 @@ class DirectJevProvider:
         input_tokens = int(usage.get("input_tokens", 0)) if isinstance(usage, Mapping) else 0
         output_tokens = int(usage.get("output_tokens", 0)) if isinstance(usage, Mapping) else 0
         cost = input_tokens * self.input_price_per_billion_tokens_usd / 1_000_000_000
-        model = str(payload.get("model") or self.model)
+        model = str(payload.get("model") or "")
 
         return Decision(
             value=value,
@@ -162,6 +188,7 @@ class DirectJevProvider:
             cost_usd=cost,
             metadata={
                 "model": model,
+                "requested_model": self.model,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
                 "confidence_source": confidence_source,
@@ -194,6 +221,3 @@ class DirectJevProvider:
         if not isinstance(payload, Mapping):
             raise JevHTTPError("TypeSafe returned a non-object response")
         return self._convert(request, payload, (perf_counter() - started) * 1000)
-
-    async def adecide(self, request: DecisionRequest) -> Decision | None:
-        return await asyncio.to_thread(self.decide, request)

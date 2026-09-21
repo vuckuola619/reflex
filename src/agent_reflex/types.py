@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from math import isfinite
-from typing import Any, Hashable, Sequence
+from typing import Any
 from uuid import uuid4
 
 
-class DecisionKind(str, Enum):
+class DecisionKind(StrEnum):
     BOOLEAN = "boolean"
     CHOICE = "choice"
     SCORE = "score"

@@ -1,5 +1,4 @@
 import asyncio
-import json
 from pathlib import Path
 
 from agent_reflex import Decision, DecisionBudget, DecisionKind, DecisionRequest, ProviderStage, ReflexEngine
@@ -12,9 +11,11 @@ from agent_reflex.telemetry import JsonlTelemetrySink
 def test_deadline_timeout_abstains():
     class Slow:
         name = "slow"
+
         async def adecide(self, request):
             await asyncio.sleep(0.05)
             return Decision(True, 1.0, self.name)
+
     engine = ReflexEngine([ProviderStage(Slow(), threshold=0.5, timeout_ms=5)])
     d = asyncio.run(engine.adecide(DecisionRequest("x", "ok?"), DecisionBudget(deadline_ms=20, max_provider_calls=1)))
     assert d.abstained
@@ -24,8 +25,10 @@ def test_deadline_timeout_abstains():
 def test_circuit_breaker_opens_after_failures():
     class Broken:
         name = "broken"
+
         def decide(self, request):
             raise RuntimeError("boom")
+
     stage = ProviderStage(Broken(), timeout_ms=25)
     stage.breaker.failure_threshold = 2
     engine = ReflexEngine([stage])
@@ -38,7 +41,9 @@ def test_circuit_breaker_opens_after_failures():
 def test_high_risk_skips_untrusted_probabilistic_provider():
     provider = PrototypeProvider([Prototype("delete production", "allow")])
     engine = ReflexEngine([ProviderStage(provider, threshold=0.0)], fail_closed_risk=0.8)
-    d = engine.decide(DecisionRequest("delete production", "action?", DecisionKind.CHOICE, ["allow", "deny"], risk=0.95))
+    d = engine.decide(
+        DecisionRequest("delete production", "action?", DecisionKind.CHOICE, ["allow", "deny"], risk=0.95)
+    )
     assert d.abstained
     assert d.metadata["attempts"][0]["skipped"] == "high_risk_untrusted_provider"
 
@@ -53,8 +58,10 @@ def test_high_risk_allows_deterministic_rule():
 def test_ood_gate_rejects_semantic_answer():
     class OOD:
         name = "ood"
+
         def decide(self, request):
             return Decision("a", 0.99, self.name, metadata={"ood_score": 0.95})
+
     engine = ReflexEngine([ProviderStage(OOD(), threshold=0.5, max_ood=0.5)])
     d = engine.decide(DecisionRequest("x", "pick", DecisionKind.CHOICE, ["a", "b"]))
     assert d.abstained
@@ -64,8 +71,10 @@ def test_ood_gate_rejects_semantic_answer():
 def test_non_finite_confidence_is_firewalled():
     class Bad:
         name = "bad"
+
         def decide(self, request):
             return Decision("a", float("nan"), self.name)
+
     engine = ReflexEngine([ProviderStage(Bad(), threshold=0.0)])
     d = engine.decide(DecisionRequest("x", "pick", DecisionKind.CHOICE, ["a", "b"]))
     assert d.abstained
@@ -76,7 +85,11 @@ def test_telemetry_redacts_secrets(tmp_path: Path):
     sink = JsonlTelemetrySink(tmp_path / "events.jsonl")
     rules = RuleProvider([Rule("yes", lambda r: True, True)])
     engine = ReflexEngine([ProviderStage(rules, threshold=1.0)], telemetry=sink)
-    engine.decide(DecisionRequest("token=supersecretvalue", "safe?", metadata={"authorization": "Bearer abcdefghijklmnopqrstuvwxyz"}))
+    engine.decide(
+        DecisionRequest(
+            "token=supersecretvalue", "safe?", metadata={"authorization": "Bearer abcdefghijklmnopqrstuvwxyz"}
+        )
+    )
     text = (tmp_path / "events.jsonl").read_text()
     assert "supersecretvalue" not in text
     assert "abcdefghijklmnopqrstuvwxyz" not in text
@@ -111,15 +124,18 @@ def test_health_reports_ready():
     engine = ReflexEngine([ProviderStage(rules)])
     assert engine.health()["ready"] is True
 
+
 def test_rest_api_auth_and_decision():
     from fastapi.testclient import TestClient
+
     from agent_reflex.api import create_app
+
     rules = RuleProvider([Rule("yes", lambda r: True, True)])
     app = create_app(ReflexEngine([ProviderStage(rules, threshold=1.0)]), api_keys={"test-key"}, requests_per_minute=10)
     client = TestClient(app)
     assert client.get("/healthz").status_code == 200
-    assert client.post("/v1/decide", json={"state":"x","question":"ok?"}).status_code == 401
-    r = client.post("/v1/decide", headers={"X-API-Key":"test-key"}, json={"state":"x","question":"ok?"})
+    assert client.post("/v1/decide", json={"state": "x", "question": "ok?"}).status_code == 401
+    r = client.post("/v1/decide", headers={"X-API-Key": "test-key"}, json={"state": "x", "question": "ok?"})
     assert r.status_code == 200
     assert r.json()["value"] is True
     assert r.json()["request_id"]
@@ -127,6 +143,7 @@ def test_rest_api_auth_and_decision():
 
 def test_rest_api_secure_by_default_without_keys():
     from agent_reflex.api import create_app
+
     rules = RuleProvider([Rule("yes", lambda r: True, True)])
     try:
         create_app(ReflexEngine([ProviderStage(rules)]), api_keys=set())

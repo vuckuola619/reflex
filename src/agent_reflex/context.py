@@ -27,6 +27,7 @@ class SafeContextSelector:
         kwargs = dict(max_string=self.max_string, max_items=self.max_items, max_depth=self.max_depth)
         return replace(
             request,
+            question=sanitize(request.question, **kwargs),
             state=sanitize(request.state, **kwargs),
             metadata=sanitize(request.metadata, **kwargs),
             trusted_context=sanitize(request.trusted_context, **kwargs),

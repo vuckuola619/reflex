@@ -20,4 +20,6 @@ A valid report requires:
 
 Network, authentication, quota and provider failures invalidate the comparison. They must never be interpreted as Jev accuracy failures.
 
-The sandbox used to prepare RC2 blocks outbound network access. A live attempt on 2026-09-20 therefore failed closed with `jev_comparison_valid=false`; this is an environment limitation, not a Jev result.
+A subsequent authorized live eight-case smoke succeeded against observed model `jev-1.13.0`: Jev answered 8/8 correctly; the then-current local demo answered 6/8 and abstained twice. This is a tiny synthetic smoke, not superiority evidence. Results are stored locally in `artifacts/live-jev.json`.
+
+The newer real-observation comparison is `benchmarks/real_workload.py`. After approval, all 42 live calls succeeded against observed `jev-1.13.0`. Jev and Reflex exact checks both got 17/17 primary observations correct. See the [live comparison](JEV_COMPARISON.md) for latency, costs, semantic results, stress cases and limits. Never score an unavailable/unauthorized remote run as model error.

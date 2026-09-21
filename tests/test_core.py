@@ -33,8 +33,10 @@ def test_summary_metrics():
 def test_invalid_provider_output_never_escapes():
     class BadProvider:
         name = "bad"
+
         def decide(self, request):
             from agent_reflex import Decision
+
             return Decision(value="NOT_AN_OPTION", confidence=1.0, provider=self.name)
 
     engine = ReflexEngine([ProviderStage(BadProvider(), 0.0)])

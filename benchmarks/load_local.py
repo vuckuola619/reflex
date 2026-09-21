@@ -10,19 +10,25 @@ from agent_reflex.providers import Prototype, PrototypeProvider, Rule, RuleProvi
 
 
 def build_engine() -> ReflexEngine:
-    rules = RuleProvider([
-        Rule("git-read", lambda r: str(r.state).startswith(("git status", "git diff")), "allow"),
-        Rule("root-delete", lambda r: "rm -rf /" in str(r.state), "deny"),
-    ])
-    proto = PrototypeProvider([
-        Prototype("changed authentication session token", "auth"),
-        Prototype("dependency lockfile package version", "full"),
-        Prototype("small parser utility helper", "unit"),
-    ])
-    return ReflexEngine([
-        ProviderStage(rules, threshold=1.0, timeout_ms=20, sanitize_context=False),
-        ProviderStage(proto, threshold=0.55, timeout_ms=30, max_ood=0.9),
-    ])
+    rules = RuleProvider(
+        [
+            Rule("git-read", lambda r: str(r.state).startswith(("git status", "git diff")), "allow"),
+            Rule("root-delete", lambda r: "rm -rf /" in str(r.state), "deny"),
+        ]
+    )
+    proto = PrototypeProvider(
+        [
+            Prototype("changed authentication session token", "auth"),
+            Prototype("dependency lockfile package version", "full"),
+            Prototype("small parser utility helper", "unit"),
+        ]
+    )
+    return ReflexEngine(
+        [
+            ProviderStage(rules, threshold=1.0, timeout_ms=20, sanitize_context=False),
+            ProviderStage(proto, threshold=0.55, timeout_ms=30, max_ood=0.9),
+        ]
+    )
 
 
 async def run(n: int, concurrency: int) -> None:
@@ -38,14 +44,16 @@ async def run(n: int, concurrency: int) -> None:
     out = await engine.adecide_many(reqs, concurrency=concurrency)
     elapsed = perf_counter() - started
     latencies = [x.latency_ms for x in out]
-    print({
-        "n": n,
-        "concurrency": concurrency,
-        "elapsed_s": elapsed,
-        "decisions_per_second": n / elapsed,
-        "mean_provider_latency_ms": mean(latencies),
-        "abstention_rate": sum(x.abstained for x in out) / n,
-    })
+    print(
+        {
+            "n": n,
+            "concurrency": concurrency,
+            "elapsed_s": elapsed,
+            "decisions_per_second": n / elapsed,
+            "mean_provider_latency_ms": mean(latencies),
+            "abstention_rate": sum(x.abstained for x in out) / n,
+        }
+    )
 
 
 if __name__ == "__main__":

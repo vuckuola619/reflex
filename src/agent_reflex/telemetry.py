@@ -46,9 +46,8 @@ class JsonlTelemetrySink:
 
     def emit(self, event: DecisionEvent) -> None:
         payload = sanitize(asdict(event))
-        with self._lock:
-            with self.path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
+        with self._lock, self.path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
 
 
 class OpenTelemetrySink:
@@ -67,7 +66,7 @@ class OpenTelemetrySink:
         self._abstains = meter.create_counter("agent_reflex.abstains")
 
     def emit(self, event: DecisionEvent) -> None:  # pragma: no cover - integration adapter
-        attrs = {
+        attrs: dict[str, str | bool | int | float] = {
             "decision.kind": event.kind,
             "decision.provider": event.provider,
             "decision.abstained": event.abstained,

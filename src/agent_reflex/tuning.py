@@ -42,7 +42,7 @@ def tune_thresholds(
     by_name_rows = [({a.provider: a for a in row.attempts}, row.gold) for row in rows]
 
     for values in product(grid, repeat=len(provider_order)):
-        thresholds = dict(zip(provider_order, values))
+        thresholds = dict(zip(provider_order, values, strict=False))
         correct = 0
         answered = 0
         total_cost = 0.0
@@ -52,7 +52,7 @@ def tune_thresholds(
             picked = None
             for name in provider_order:
                 attempt = attempts.get(name)
-                if attempt is None:
+                if attempt is None or attempt.decision is None or attempt.decision.abstained:
                     continue
                 total_latency += attempt.decision.latency_ms
                 total_cost += attempt.decision.cost_usd
