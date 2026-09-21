@@ -23,7 +23,7 @@ classifiers = [
 dependencies = ["pydantic>=2.8,<3"]
 
 [project.optional-dependencies]
-semantic = ["sentence-transformers>=3,<6", "numpy>=1.26,<3"]
+semantic = ["sentence-transformers>=3,<7", "numpy>=1.26,<3"]
 local-model = ["transformers>=4.45,<6", "torch>=2.4"]
 jev = ["pydantic-ai-slim[typesafe]>=2.46,<3"]
 mcp = ["mcp>=2,<3"]
@@ -42,7 +42,7 @@ dev = [
 ]
 security = ["pip-audit>=2.7,<3"]
 all = [
-  "sentence-transformers>=3,<6",
+  "sentence-transformers>=3,<7",
   "numpy>=1.26,<3",
   "transformers>=4.45,<6",
   "torch>=2.4",
